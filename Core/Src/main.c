@@ -20,96 +20,179 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
-
-/* USER CODE END Includes */
-
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
-
-/* USER CODE END PTD */
-
-/* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
-/* USER CODE END PD */
-
-/* Private macro -------------------------------------------------------------*/
-/* USER CODE BEGIN PM */
-
-/* USER CODE END PM */
-
-/* Private variables ---------------------------------------------------------*/
-
-/* USER CODE BEGIN PV */
-
-/* USER CODE END PV */
-
-/* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-/* USER CODE BEGIN PFP */
+uint8_t IsButPressed(uint32_t pressDelay);
+void Blink (uint32_t *qtty);
 
-/* USER CODE END PFP */
 
-/* Private user code ---------------------------------------------------------*/
-/* USER CODE BEGIN 0 */
+enum State
+	{
+		NONE,		// нихуя
+		RECORD,		//  кнопку нажали, идет стадия записи кол-ва нажатий
+		PLAY		//  проигрывание кол-ва нажатий
+	};
 
-/* USER CODE END 0 */
+	enum State ProgStatus = NONE;	// переменная для машины состояний
+	uint32_t PressCounter = 0;
+	uint32_t RecordDelay = 2000;
+	uint32_t BlinkOn = 100;
+	uint32_t BlinkOff = 1000;
 
-/**
-  * @brief  The application entry point.
-  * @retval int
-  */
 int main(void)
 {
 
-#define LED_PIN		GPIO_PIN_13
-#define LED_PORT	GPIOC
+	#define LED_PIN		GPIO_PIN_13
+	#define LED_PORT	GPIOC
 
-#define BUT_PIN		GPIO_PIN_1
-#define BUT_PORT	GPIOA
-  /* USER CODE BEGIN 1 */
+	#define BUT_PIN		GPIO_PIN_1
+	#define BUT_PORT	GPIOA
+	#define LED_ON()		HAL_GPIO_WritePin(LED_PORT,LED_PIN,1)
+	#define LED_OFF()		HAL_GPIO_WritePin(LED_PORT,LED_PIN,0)
 
-  /* USER CODE END 1 */
+	HAL_Init();
+	SystemClock_Config();
+	MX_GPIO_Init();
 
-  /* MCU Configuration--------------------------------------------------------*/
 
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
 
-  /* USER CODE BEGIN Init */
-
-  /* USER CODE END Init */
-
-  /* Configure the system clock */
-  SystemClock_Config();
-
-  /* USER CODE BEGIN SysInit */
-
-  /* USER CODE END SysInit */
-
-  /* Initialize all configured peripherals */
-  MX_GPIO_Init();
-  /* USER CODE BEGIN 2 */
-
-  /* USER CODE END 2 */
-
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  while (1)
+  while (1)		// в бесконечном цикле и не блокирующем режиме
   {
-    /* USER CODE END WHILE */
+	  switch(ProgStatus)	 
+	  {
+		  static uint32_t counter = 0;
+		  case NONE:		// ждем хоть одного нажатия
+		  {
+			  if(IsButPressed(10))
+			  {
+				  ProgStatus = RECORD;
+				  PressCounter++;
+				  break;
+				  counter = HAL_GetTick();	// запоминаем момент перехода
+			  }
+		  } break;
+		  case RECORD:		// считаем нажатия и ждем когда не будет нажатия N сек
+		  {
+			  
+			  if(IsButPressed(50))	
+			  {
+				  counter = HAL_GetTick();
+				  PressCounter++;
+			  }
+			  if (HAL_GetTick()> counter+RecordDelay)	// если с последнего нажатия прошло N секунд, то идем в проигрывание
+			  {
+				  ProgStatus=PLAY;
+				  counter = HAL_GetTick();	// запоминаем момент перехода
+				  break;
+			  }
+			  
+		  }break;
+		  case PLAY:
+		  {
+			  Blink(PressCounter);
+			  if(PressCounter==0)
+			  {
+				  counter = HAL_GetTick();	// запоминаем момент перехода
+				  ProgStatus = NONE;
+			  }
+			  
+		  }break;
 
-    /* USER CODE BEGIN 3 */
+	  }
   }
   /* USER CODE END 3 */
 }
 
-/**
-  * @brief System Clock Configuration
-  * @retval None
-  */
+uint8_t IsButPressed(uint32_t pressDelay)
+{
+	enum State
+	{
+		NONE,
+		PRESSED,
+		RELIASED
+	};
+	static enum State ButState= NONE;
+	
+	static uint8_t result = 0;
+	static uint32_t counter = 0;
+	switch (ButState)
+	{
+		case NONE:
+		{
+			if(HAL_GPIO_ReadPin(BUT_PORT,BUT_PIN)==0) 	{ButState = PRESSED;}		// если было касание, то переходим в нажатие
+			else										{counter = HAL_GetTick(); result = 0;}
+		}break;
+		case PRESSED:
+		{
+			if(HAL_GPIO_ReadPin(BUT_PORT,BUT_PIN)==0)
+			{
+				if(HAL_GetTick()>counter+pressDelay)	// если кнопка нажата более N милисекунд, то она нажата
+				{
+					counter = HAL_GetTick();
+					ButState = RELIASED;
+				}
+			}
+			else										//если дребезг, то падаем в начало
+			{
+				counter = HAL_GetTick();
+				ButState = NONE;
+			}
+		}break;
+		case RELIASED:
+		{
+			if(HAL_GPIO_ReadPin(BUT_PORT,BUT_PIN)==1)	// теперь ждем пока оптустит
+			{
+				ButState = NONE;
+				result = 1;
+			}
+		}break;
+	}
+	return result;
+}
+void Blink (uint32_t *qtty)
+{
+		enum State
+	{
+		NONE,		// нихуя 
+		ON,		//  горение
+		OFF		//  не горение
+	};
+	enum State LedStatus = NONE;	// переменная для машины состояний
+	static uint32_t counter = 0;
+	
+	switch(LedStatus)	 
+	{
+		case NONE:
+		{
+			counter = HAL_GetTick();
+			LedStatus = ON;
+		}break;
+		case ON:
+		{
+			LED_ON();
+			if (HAL_GetTick()> counter+BlinkOn)
+			{
+				counter = HAL_GetTick();
+				LedStatus = OFF;
+			}
+		}break;
+		case OFF:
+		{
+			LED_OFF();
+			if (HAL_GetTick()> counter+BlinkOff)
+			{
+				uint32_t var;
+				var = *qtty;
+				var= var-1;
+				*qtty = var;
+
+				counter = HAL_GetTick();
+				LedStatus = NONE;
+			}
+		}break;
+	}
+	
+}
 void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
@@ -144,11 +227,6 @@ void SystemClock_Config(void)
   HAL_RCC_MCOConfig(RCC_MCO, RCC_MCO1SOURCE_SYSCLK, RCC_MCODIV_1);
 }
 
-/**
-  * @brief GPIO Initialization Function
-  * @param None
-  * @retval None
-  */
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
@@ -181,23 +259,13 @@ static void MX_GPIO_Init(void)
 
 }
 
-/* USER CODE BEGIN 4 */
-
-/* USER CODE END 4 */
-
-/**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
 void Error_Handler(void)
 {
-  /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
+
   __disable_irq();
   while (1)
   {
   }
-  /* USER CODE END Error_Handler_Debug */
 }
 
 #ifdef  USE_FULL_ASSERT
