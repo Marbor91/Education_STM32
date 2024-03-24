@@ -37,22 +37,25 @@ enum State
 	uint32_t PressCounter = 0;
 	uint32_t RecordDelay = 2000;
 	uint32_t BlinkOn = 100;
-	uint32_t BlinkOff = 1000;
+	uint32_t BlinkOff = 600;
 
 int main(void)
 {
 
-	#define LED_PIN		GPIO_PIN_13
-	#define LED_PORT	GPIOC
+	#define LED_PIN		GPIO_PIN_1
+	#define LED_PORT	GPIOA
 
-	#define BUT_PIN		GPIO_PIN_1
+	#define BUT_PIN		GPIO_PIN_0
 	#define BUT_PORT	GPIOA
-	#define LED_ON()		HAL_GPIO_WritePin(LED_PORT,LED_PIN,1)
-	#define LED_OFF()		HAL_GPIO_WritePin(LED_PORT,LED_PIN,0)
+	#define LED_ON()		HAL_GPIO_WritePin(LED_PORT,LED_PIN,LED_ON_STATE)
+	#define LED_OFF()		HAL_GPIO_WritePin(LED_PORT,LED_PIN,LED_OFF_STATE)
+	#define LED_ON_STATE	0
+	#define LED_OFF_STATE 1
 
 	HAL_Init();
 	SystemClock_Config();
 	MX_GPIO_Init();
+	HAL_GPIO_WritePin(LED_PORT, LED_PIN, LED_OFF_STATE);
 
 
 
@@ -74,7 +77,7 @@ int main(void)
 		  case RECORD:		// считаем нажатия и ждем когда не будет нажатия N сек
 		  {
 			  
-			  if(IsButPressed(50))	
+			  if(IsButPressed(200))
 			  {
 				  counter = HAL_GetTick();
 				  PressCounter++;
@@ -89,7 +92,7 @@ int main(void)
 		  }break;
 		  case PLAY:
 		  {
-			  Blink(PressCounter);
+			  Blink(&PressCounter);
 			  if(PressCounter==0)
 			  {
 				  counter = HAL_GetTick();	// запоминаем момент перехода
@@ -136,6 +139,7 @@ uint8_t IsButPressed(uint32_t pressDelay)
 			{
 				counter = HAL_GetTick();
 				ButState = NONE;
+				result = 0;
 			}
 		}break;
 		case RELIASED:
@@ -157,7 +161,7 @@ void Blink (uint32_t *qtty)
 		ON,		//  горение
 		OFF		//  не горение
 	};
-	enum State LedStatus = NONE;	// переменная для машины состояний
+	static enum State LedStatus = NONE;	// переменная для машины состояний
 	static uint32_t counter = 0;
 	
 	switch(LedStatus)	 
@@ -184,7 +188,7 @@ void Blink (uint32_t *qtty)
 				uint32_t var;
 				var = *qtty;
 				var= var-1;
-				*qtty = var;
+				*qtty = var;	// декрементируем переменную по указателю.
 
 				counter = HAL_GetTick();
 				LedStatus = NONE;
