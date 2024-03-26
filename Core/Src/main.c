@@ -44,13 +44,22 @@ int main(void)
 
 	#define LED_PIN		GPIO_PIN_1
 	#define LED_PORT	GPIOA
-
 	#define BUT_PIN		GPIO_PIN_0
 	#define BUT_PORT	GPIOA
-	#define LED_ON()		HAL_GPIO_WritePin(LED_PORT,LED_PIN,LED_ON_STATE)
-	#define LED_OFF()		HAL_GPIO_WritePin(LED_PORT,LED_PIN,LED_OFF_STATE)
-	#define LED_ON_STATE	0
-	#define LED_OFF_STATE 1
+
+	#define DEBUG_PIN_2	GPIO_PIN_2
+	#define DEBUG_PIN_3	GPIO_PIN_3
+	#define DEBUG_PIN_4	GPIO_PIN_4
+	#define DEBUG_PIN_5	GPIO_PIN_5
+	#define DEBUG_PORT	GPIOA
+
+	#define DEBUG_PIN_ON(X_PIN)	HAL_GPIO_WritePin(DEBUG_PORT,X_PIN,1)
+	#define DEBUG_PIN_OFF(X_PIN)	HAL_GPIO_WritePin(DEBUG_PORT,X_PIN,0)
+	
+	#define LED_ON()			HAL_GPIO_WritePin(LED_PORT,LED_PIN,LED_ON_STATE)
+	#define LED_OFF()			HAL_GPIO_WritePin(LED_PORT,LED_PIN,LED_OFF_STATE)
+	#define LED_ON_STATE		0
+	#define LED_OFF_STATE 		1
 
 	HAL_Init();
 	SystemClock_Config();
@@ -66,27 +75,27 @@ int main(void)
 		  static uint32_t counter = 0;
 		  case NONE:		// ждем хоть одного нажатия
 		  {
-			  if(IsButPressed(10))
+			  if(IsButPressed(100))
 			  {
 				  ProgStatus = RECORD;
 				  PressCounter++;
-				  break;
 				  counter = HAL_GetTick();	// запоминаем момент перехода
 			  }
 		  } break;
 		  case RECORD:		// считаем нажатия и ждем когда не будет нажатия N сек
 		  {
 			  
-			  if(IsButPressed(200))
+			  if(IsButPressed(100))
 			  {
 				  counter = HAL_GetTick();
 				  PressCounter++;
+				  DEBUG_PIN_ON(DEBUG_PIN_5);
+				  DEBUG_PIN_OFF(DEBUG_PIN_5);
 			  }
 			  if (HAL_GetTick()> counter+RecordDelay)	// если с последнего нажатия прошло N секунд, то идем в проигрывание
 			  {
 				  ProgStatus=PLAY;
 				  counter = HAL_GetTick();	// запоминаем момент перехода
-				  break;
 			  }
 			  
 		  }break;
@@ -122,32 +131,39 @@ uint8_t IsButPressed(uint32_t pressDelay)
 	{
 		case NONE:
 		{
+			result = 0;
 			if(HAL_GPIO_ReadPin(BUT_PORT,BUT_PIN)==0) 	{ButState = PRESSED;}		// если было касание, то переходим в нажатие
-			else										{counter = HAL_GetTick(); result = 0;}
+			else										{counter = HAL_GetTick();}
 		}break;
 		case PRESSED:
 		{
+			result = 0;
+			HAL_GPIO_WritePin(DEBUG_PORT, DEBUG_PIN_2, 1);
 			if(HAL_GPIO_ReadPin(BUT_PORT,BUT_PIN)==0)
 			{
 				if(HAL_GetTick()>counter+pressDelay)	// если кнопка нажата более N милисекунд, то она нажата
 				{
 					counter = HAL_GetTick();
 					ButState = RELIASED;
+					HAL_GPIO_WritePin(DEBUG_PORT, DEBUG_PIN_2, 0);
+					HAL_GPIO_WritePin(DEBUG_PORT, DEBUG_PIN_3, 1);
 				}
 			}
 			else										//если дребезг, то падаем в начало
 			{
+				HAL_GPIO_WritePin(DEBUG_PORT, DEBUG_PIN_2, 0);
 				counter = HAL_GetTick();
 				ButState = NONE;
-				result = 0;
 			}
 		}break;
 		case RELIASED:
 		{
+			result = 0;
 			if(HAL_GPIO_ReadPin(BUT_PORT,BUT_PIN)==1)	// теперь ждем пока оптустит
 			{
 				ButState = NONE;
 				result = 1;
+				HAL_GPIO_WritePin(DEBUG_PORT, DEBUG_PIN_3, 0);
 			}
 		}break;
 	}
@@ -179,6 +195,7 @@ void Blink (uint32_t *qtty)
 				counter = HAL_GetTick();
 				LedStatus = OFF;
 			}
+			
 		}break;
 		case OFF:
 		{
@@ -248,6 +265,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_PORT, &GPIO_InitStruct);
+
+	GPIO_InitStruct.Pin = DEBUG_PIN_2|DEBUG_PIN_3|DEBUG_PIN_4|DEBUG_PIN_5;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(DEBUG_PORT, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PA1 */
   GPIO_InitStruct.Pin = BUT_PIN;
