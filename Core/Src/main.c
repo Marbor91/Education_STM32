@@ -19,47 +19,22 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "perif.h"
 
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-uint8_t IsButPressed(uint32_t pressDelay);
-void Blink (uint32_t *qtty);
+extern uint8_t IsButPressed(uint32_t pressDelay);
+extern void Blink (uint32_t *qtty);
+extern void Blinky(uint32_t duration);
+void Marbor_task (void);
+void Kris_task (void);
 
 
-enum State
-	{
-		NONE,		// нихуя
-		RECORD,		//  кнопку нажали, идет стадия записи кол-ва нажатий
-		PLAY		//  проигрывание кол-ва нажатий
-	};
-
-	enum State ProgStatus = NONE;	// переменная для машины состояний
-	uint32_t PressCounter = 0;
 	uint32_t RecordDelay = 2000;
-	uint32_t BlinkOn = 100;
-	uint32_t BlinkOff = 600;
+
 
 int main(void)
 {
-
-	#define LED_PIN		GPIO_PIN_1
-	#define LED_PORT	GPIOA
-	#define BUT_PIN		GPIO_PIN_0
-	#define BUT_PORT	GPIOA
-
-	#define DEBUG_PIN_2	GPIO_PIN_2
-	#define DEBUG_PIN_3	GPIO_PIN_3
-	#define DEBUG_PIN_4	GPIO_PIN_4
-	#define DEBUG_PIN_5	GPIO_PIN_5
-	#define DEBUG_PORT	GPIOA
-
-	#define DEBUG_PIN_ON(X_PIN)	HAL_GPIO_WritePin(DEBUG_PORT,X_PIN,1)
-	#define DEBUG_PIN_OFF(X_PIN)	HAL_GPIO_WritePin(DEBUG_PORT,X_PIN,0)
-	
-	#define LED_ON()			HAL_GPIO_WritePin(LED_PORT,LED_PIN,LED_ON_STATE)
-	#define LED_OFF()			HAL_GPIO_WritePin(LED_PORT,LED_PIN,LED_OFF_STATE)
-	#define LED_ON_STATE		0
-	#define LED_OFF_STATE 		1
 
 	HAL_Init();
 	SystemClock_Config();
@@ -68,8 +43,86 @@ int main(void)
 
 
 
-  while (1)		// в бесконечном цикле и не блокирующем режиме
-  {
+	while (1)		// в бесконечном цикле и не блокирующем режиме
+	{
+	  Marbor_task();
+	  //Kris_task();
+	}
+}
+
+void Kris_task (void)
+{
+	enum ButState
+	{
+		NONE,
+		LONG_PRESS,
+		SHORT_PRESS,
+
+	};
+	enum ProgState
+	{
+		OFF,
+		LONG_BLINK,
+		SHORT_BLINK
+	};
+
+	static enum ProgState ProgStatus = OFF;	// переменная для машины состояний
+	static enum ButState ButStatus = NONE;		// это для кнопки
+	static uint32_t counter = 0;
+	const uint32_t long_duration = 1500;
+	const uint32_t long_blink_duration = 500;
+	const uint32_t short_blink_duration = 100;
+	
+
+	if(IsButPressed(100))	// bounce avoid
+		{
+			if(counter - HAL_GetTick() > long_duration)
+			{
+				ButStatus = LONG_PRESS;
+
+			}
+			else
+			{
+				ButStatus = SHORT_PRESS;
+			}
+		}
+	switch(ProgStatus)	 
+	  {
+		case OFF:		// ждем хоть одного нажатия
+		{
+			if (ButStatus==LONG_PRESS) {ProgStatus = LONG_BLINK;ButStatus = NONE; }
+			else 					   {ProgStatus = SHORT_BLINK;}
+		} break;
+		case LONG_BLINK:
+		{
+			if (ButStatus==LONG_PRESS) {ProgStatus = OFF;ButStatus = NONE;}
+			else 					   {Blinky(long_blink_duration);}
+		} break;
+		case SHORT_BLINK:
+		{
+			if (ButStatus==SHORT_PRESS) {ProgStatus = OFF;ButStatus = NONE; }
+			else 					   {Blinky(short_blink_duration);}
+		} break;
+
+	  }
+
+
+
+}
+
+
+void Marbor_task (void)
+{
+	enum State
+	{
+		NONE,		// нихуя
+		RECORD,		//  кнопку нажали, идет стадия записи кол-ва нажатий
+		PLAY		//  проигрывание кол-ва нажатий
+	};
+
+	static enum State ProgStatus = NONE;	// переменная для машины состояний
+	uint32_t PressCounter = 0;
+	
 	  switch(ProgStatus)	 
 	  {
 		  static uint32_t counter = 0;
@@ -112,108 +165,8 @@ int main(void)
 
 	  }
   }
-  /* USER CODE END 3 */
-}
 
-uint8_t IsButPressed(uint32_t pressDelay)
-{
-	enum State
-	{
-		NONE,
-		PRESSED,
-		RELIASED
-	};
-	static enum State ButState= NONE;
-	
-	static uint8_t result = 0;
-	static uint32_t counter = 0;
-	switch (ButState)
-	{
-		case NONE:
-		{
-			result = 0;
-			if(HAL_GPIO_ReadPin(BUT_PORT,BUT_PIN)==0) 	{ButState = PRESSED;}		// если было касание, то переходим в нажатие
-			else										{counter = HAL_GetTick();}
-		}break;
-		case PRESSED:
-		{
-			result = 0;
-			HAL_GPIO_WritePin(DEBUG_PORT, DEBUG_PIN_2, 1);
-			if(HAL_GPIO_ReadPin(BUT_PORT,BUT_PIN)==0)
-			{
-				if(HAL_GetTick()>counter+pressDelay)	// если кнопка нажата более N милисекунд, то она нажата
-				{
-					counter = HAL_GetTick();
-					ButState = RELIASED;
-					HAL_GPIO_WritePin(DEBUG_PORT, DEBUG_PIN_2, 0);
-					HAL_GPIO_WritePin(DEBUG_PORT, DEBUG_PIN_3, 1);
-				}
-			}
-			else										//если дребезг, то падаем в начало
-			{
-				HAL_GPIO_WritePin(DEBUG_PORT, DEBUG_PIN_2, 0);
-				counter = HAL_GetTick();
-				ButState = NONE;
-			}
-		}break;
-		case RELIASED:
-		{
-			result = 0;
-			if(HAL_GPIO_ReadPin(BUT_PORT,BUT_PIN)==1)	// теперь ждем пока оптустит
-			{
-				ButState = NONE;
-				result = 1;
-				HAL_GPIO_WritePin(DEBUG_PORT, DEBUG_PIN_3, 0);
-			}
-		}break;
-	}
-	return result;
-}
-void Blink (uint32_t *qtty)
-{
-		enum State
-	{
-		NONE,		// нихуя 
-		ON,		//  горение
-		OFF		//  не горение
-	};
-	static enum State LedStatus = NONE;	// переменная для машины состояний
-	static uint32_t counter = 0;
-	
-	switch(LedStatus)	 
-	{
-		case NONE:
-		{
-			counter = HAL_GetTick();
-			LedStatus = ON;
-		}break;
-		case ON:
-		{
-			LED_ON();
-			if (HAL_GetTick()> counter+BlinkOn)
-			{
-				counter = HAL_GetTick();
-				LedStatus = OFF;
-			}
-			
-		}break;
-		case OFF:
-		{
-			LED_OFF();
-			if (HAL_GetTick()> counter+BlinkOff)
-			{
-				uint32_t var;
-				var = *qtty;
-				var= var-1;
-				*qtty = var;	// декрементируем переменную по указателю.
 
-				counter = HAL_GetTick();
-				LedStatus = NONE;
-			}
-		}break;
-	}
-	
-}
 void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
@@ -247,7 +200,6 @@ void SystemClock_Config(void)
   }
   HAL_RCC_MCOConfig(RCC_MCO, RCC_MCO1SOURCE_SYSCLK, RCC_MCODIV_1);
 }
-
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};

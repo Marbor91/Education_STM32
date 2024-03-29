@@ -47,7 +47,24 @@ extern "C" {
 
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
+#define LED_PIN		GPIO_PIN_1
+#define LED_PORT	GPIOA
+#define BUT_PIN		GPIO_PIN_0
+#define BUT_PORT	GPIOA
 
+#define DEBUG_PIN_2	GPIO_PIN_2
+#define DEBUG_PIN_3	GPIO_PIN_3
+#define DEBUG_PIN_4	GPIO_PIN_4
+#define DEBUG_PIN_5	GPIO_PIN_5
+#define DEBUG_PORT	GPIOA
+
+#define DEBUG_PIN_ON(X_PIN)	HAL_GPIO_WritePin(DEBUG_PORT,X_PIN,1)
+#define DEBUG_PIN_OFF(X_PIN)	HAL_GPIO_WritePin(DEBUG_PORT,X_PIN,0)
+
+#define LED_ON()			HAL_GPIO_WritePin(LED_PORT,LED_PIN,LED_ON_STATE)
+#define LED_OFF()			HAL_GPIO_WritePin(LED_PORT,LED_PIN,LED_OFF_STATE)
+#define LED_ON_STATE		0
+#define LED_OFF_STATE 		1
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/
